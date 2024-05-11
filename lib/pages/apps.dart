@@ -26,6 +26,92 @@ class AppsPage extends StatefulWidget {
   State<AppsPage> createState() => AppsPageState();
 }
 
+showChangeLogDialog(BuildContext context, App app, String? changesUrl,
+    AppSource appSource, String changeLog) {
+  showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return GeneratedFormModal(
+          title: tr('changes'),
+          items: const [],
+          message: app.latestVersion,
+          additionalWidgets: [
+            changesUrl != null
+                ? GestureDetector(
+                    child: Text(
+                      changesUrl,
+                      style: const TextStyle(
+                          decoration: TextDecoration.underline,
+                          fontStyle: FontStyle.italic),
+                    ),
+                    onTap: () {
+                      launchUrlString(changesUrl,
+                          mode: LaunchMode.externalApplication);
+                    },
+                  )
+                : const SizedBox.shrink(),
+            changesUrl != null
+                ? const SizedBox(
+                    height: 16,
+                  )
+                : const SizedBox.shrink(),
+            appSource.changeLogIfAnyIsMarkDown
+                ? SizedBox(
+                    width: MediaQuery.of(context).size.width,
+                    height: MediaQuery.of(context).size.height - 350,
+                    child: Markdown(
+                      data: changeLog,
+                      onTapLink: (text, href, title) {
+                        if (href != null) {
+                          launchUrlString(
+                              href.startsWith('http://') ||
+                                      href.startsWith('https://')
+                                  ? href
+                                  : '${Uri.parse(app.url).origin}/$href',
+                              mode: LaunchMode.externalApplication);
+                        }
+                      },
+                      extensionSet: md.ExtensionSet(
+                        md.ExtensionSet.gitHubFlavored.blockSyntaxes,
+                        [
+                          md.EmojiSyntax(),
+                          ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes
+                        ],
+                      ),
+                    ))
+                : Text(changeLog),
+          ],
+          singleNullReturnButton: tr('ok'),
+        );
+      });
+}
+
+getChangeLogFn(BuildContext context, App app) {
+  AppSource appSource =
+      SourceProvider().getSource(app.url, overrideSource: app.overrideSource);
+  String? changesUrl = appSource.changeLogPageFromStandardUrl(app.url);
+  String? changeLog = app.changeLog;
+  if (changeLog?.split('\n').length == 1) {
+    if (RegExp(
+            '(http|ftp|https)://([\\w_-]+(?:(?:\\.[\\w_-]+)+))([\\w.,@?^=%&:/~+#-]*[\\w@?^=%&/~+#-])?')
+        .hasMatch(changeLog!)) {
+      if (changesUrl == null) {
+        changesUrl = changeLog;
+        changeLog = null;
+      }
+    }
+  }
+  return (changeLog == null && changesUrl == null)
+      ? null
+      : () {
+          if (changeLog != null) {
+            showChangeLogDialog(context, app, changesUrl, appSource, changeLog);
+          } else {
+            launchUrlString(changesUrl!, mode: LaunchMode.externalApplication);
+          }
+        };
+}
+
 class AppsPageState extends State<AppsPage> {
   AppsFilter filter = AppsFilter();
   final AppsFilter neutralFilter = AppsFilter();
@@ -262,66 +348,6 @@ class AppsPageState extends State<AppsPage> {
         .where((a) => selectedAppIds.contains(a.id))
         .toSet();
 
-    showChangeLogDialog(
-        String? changesUrl, AppSource appSource, String changeLog, int index) {
-      showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return GeneratedFormModal(
-              title: tr('changes'),
-              items: const [],
-              message: listedApps[index].app.latestVersion,
-              additionalWidgets: [
-                changesUrl != null
-                    ? GestureDetector(
-                        child: Text(
-                          changesUrl,
-                          style: const TextStyle(
-                              decoration: TextDecoration.underline,
-                              fontStyle: FontStyle.italic),
-                        ),
-                        onTap: () {
-                          launchUrlString(changesUrl,
-                              mode: LaunchMode.externalApplication);
-                        },
-                      )
-                    : const SizedBox.shrink(),
-                changesUrl != null
-                    ? const SizedBox(
-                        height: 16,
-                      )
-                    : const SizedBox.shrink(),
-                appSource.changeLogIfAnyIsMarkDown
-                    ? SizedBox(
-                        width: MediaQuery.of(context).size.width,
-                        height: MediaQuery.of(context).size.height - 350,
-                        child: Markdown(
-                          data: changeLog,
-                          onTapLink: (text, href, title) {
-                            if (href != null) {
-                              launchUrlString(
-                                  href.startsWith('http://') ||
-                                          href.startsWith('https://')
-                                      ? href
-                                      : '${Uri.parse(listedApps[index].app.url).origin}/$href',
-                                  mode: LaunchMode.externalApplication);
-                            }
-                          },
-                          extensionSet: md.ExtensionSet(
-                            md.ExtensionSet.gitHubFlavored.blockSyntaxes,
-                            [
-                              md.EmojiSyntax(),
-                              ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes
-                            ],
-                          ),
-                        ))
-                    : Text(changeLog),
-              ],
-              singleNullReturnButton: tr('ok'),
-            );
-          });
-    }
-
     getLoadingWidgets() {
       return [
         if (listedApps.isEmpty)
@@ -349,35 +375,6 @@ class AppsPageState extends State<AppsPage> {
             ),
           )
       ];
-    }
-
-    getChangeLogFn(int appIndex) {
-      AppSource appSource = SourceProvider().getSource(
-          listedApps[appIndex].app.url,
-          overrideSource: listedApps[appIndex].app.overrideSource);
-      String? changesUrl =
-          appSource.changeLogPageFromStandardUrl(listedApps[appIndex].app.url);
-      String? changeLog = listedApps[appIndex].app.changeLog;
-      if (changeLog?.split('\n').length == 1) {
-        if (RegExp(
-                '(http|ftp|https)://([\\w_-]+(?:(?:\\.[\\w_-]+)+))([\\w.,@?^=%&:/~+#-]*[\\w@?^=%&/~+#-])?')
-            .hasMatch(changeLog!)) {
-          if (changesUrl == null) {
-            changesUrl = changeLog;
-            changeLog = null;
-          }
-        }
-      }
-      return (changeLog == null && changesUrl == null)
-          ? null
-          : () {
-              if (changeLog != null) {
-                showChangeLogDialog(changesUrl, appSource, changeLog, appIndex);
-              } else {
-                launchUrlString(changesUrl!,
-                    mode: LaunchMode.externalApplication);
-              }
-            };
     }
 
     getUpdateButton(int appIndex) {
@@ -440,11 +437,11 @@ class AppsPageState extends State<AppsPage> {
               ? tr('changes')
               : ''
           : DateFormat('yyyy-MM-dd')
-              .format(listedApps[appIndex].app.releaseDate!);
+              .format(listedApps[appIndex].app.releaseDate!.toLocal());
     }
 
     getSingleAppHorizTile(int index) {
-      var showChangesFn = getChangeLogFn(index);
+      var showChangesFn = getChangeLogFn(context, listedApps[index].app);
       var hasUpdate = listedApps[index].app.installedVersion != null &&
           listedApps[index].app.installedVersion !=
               listedApps[index].app.latestVersion;
@@ -857,69 +854,75 @@ class AppsPageState extends State<AppsPage> {
               scrollable: true,
               content: Padding(
                 padding: const EdgeInsets.only(top: 6),
-                child: Row(
+                child: Column(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      IconButton(
+                      TextButton(
+                          onPressed: pinSelectedApps,
+                          child: Text(selectedApps
+                                  .where((element) => element.pinned)
+                                  .isEmpty
+                              ? tr('pinToTop')
+                              : tr('unpinFromTop'))),
+                      const Divider(),
+                      TextButton(
+                          onPressed: () {
+                            String urls = '';
+                            for (var a in selectedApps) {
+                              urls += '${a.url}\n';
+                            }
+                            urls = urls.substring(0, urls.length - 1);
+                            Share.share(urls,
+                                subject: 'Obtainium - ${tr('appsString')}');
+                            Navigator.of(context).pop();
+                          },
+                          child: Text(tr('shareSelectedAppURLs'))),
+                      const Divider(),
+                      TextButton(
+                          onPressed: selectedAppIds.isEmpty
+                              ? null
+                              : () {
+                                  String urls = '';
+                                  for (var a in selectedApps) {
+                                    urls +=
+                                        'https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/${Uri.encodeComponent(jsonEncode({
+                                          'id': a.id,
+                                          'url': a.url,
+                                          'author': a.author,
+                                          'name': a.name,
+                                          'preferredApkIndex':
+                                              a.preferredApkIndex,
+                                          'additionalSettings':
+                                              jsonEncode(a.additionalSettings)
+                                        }))}\n\n';
+                                  }
+                                  Share.share(urls,
+                                      subject:
+                                          'Obtainium - ${tr('appsString')}');
+                                },
+                          child: Text(tr('shareAppConfigLinks'))),
+                      const Divider(),
+                      TextButton(
+                          onPressed: () {
+                            appsProvider
+                                .downloadAppAssets(
+                                    selectedApps.map((e) => e.id).toList(),
+                                    globalNavigatorKey.currentContext ??
+                                        context)
+                                .catchError((e) => showError(
+                                    e,
+                                    globalNavigatorKey.currentContext ??
+                                        context));
+                            Navigator.of(context).pop();
+                          },
+                          child: Text(tr('downloadX',
+                              args: [tr('releaseAsset').toLowerCase()]))),
+                      const Divider(),
+                      TextButton(
                           onPressed: appsProvider.areDownloadsRunning()
                               ? null
                               : showMassMarkDialog,
-                          tooltip: tr('markSelectedAppsUpdated'),
-                          icon: const Icon(Icons.done)),
-                      IconButton(
-                        onPressed: pinSelectedApps,
-                        tooltip: selectedApps
-                                .where((element) => element.pinned)
-                                .isEmpty
-                            ? tr('pinToTop')
-                            : tr('unpinFromTop'),
-                        icon: Icon(selectedApps
-                                .where((element) => element.pinned)
-                                .isEmpty
-                            ? Icons.bookmark_outline_rounded
-                            : Icons.bookmark_remove_outlined),
-                      ),
-                      IconButton(
-                        onPressed: () {
-                          String urls = '';
-                          for (var a in selectedApps) {
-                            urls += '${a.url}\n';
-                          }
-                          urls = urls.substring(0, urls.length - 1);
-                          Share.share(urls,
-                              subject: 'Obtainium - ${tr('appsString')}');
-                          Navigator.of(context).pop();
-                        },
-                        tooltip: tr('shareSelectedAppURLs'),
-                        icon: const Icon(Icons.share_rounded),
-                      ),
-                      IconButton(
-                        onPressed: selectedAppIds.isEmpty
-                            ? null
-                            : () {
-                                String urls =
-                                    '<p>${tr('customLinkMessage')}:</p>\n\n<ul>\n';
-                                for (var a in selectedApps) {
-                                  urls +=
-                                      '    <li><a href="obtainium://app/${Uri.encodeComponent(jsonEncode({
-                                        'id': a.id,
-                                        'url': a.url,
-                                        'author': a.author,
-                                        'name': a.name,
-                                        'preferredApkIndex':
-                                            a.preferredApkIndex,
-                                        'additionalSettings':
-                                            jsonEncode(a.additionalSettings)
-                                      }))}">${a.name}</a></li>\n';
-                                }
-                                urls +=
-                                    '</ul>\n\n<p><a href="$obtainiumUrl">${tr('about')}</a></p>';
-                                Share.share(urls,
-                                    subject: 'Obtainium - ${tr('appsString')}');
-                              },
-                        tooltip: tr('shareAppConfigLinks'),
-                        icon: const Icon(Icons.ios_share),
-                      ),
+                          child: Text(tr('markSelectedAppsUpdated'))),
                     ]),
               ),
             );

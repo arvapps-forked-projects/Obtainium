@@ -22,6 +22,9 @@
     "requiredInBrackets": "(обязательно)",
     "dropdownNoOptsError": "Ошибка: в выпадающем списке должна быть выбрана хотя бы одна настройка",
     "colour": "Цвет",
+    "standard": "Стандартный",
+    "custom": "Индивидуальный",
+    "useMaterialYou": "Использовать Material You",
     "githubStarredRepos": "Избранные репозитории GitHub",
     "uname": "Имя пользователя",
     "wrongArgNum": "Неправильное количество предоставленных аргументов",
@@ -110,6 +113,7 @@
     "dark": "Тёмная",
     "light": "Светлая",
     "followSystem": "Системная",
+    "followSystemThemeExplanation": "Следование системной теме возможно только при использовании сторонних приложений",
     "useBlackTheme": "Использовать чёрную тему",
     "appSortBy": "Сортировка приложений",
     "authorName": "Автор/Название",
@@ -143,8 +147,10 @@
     "noNewUpdates": "Нет новых обновлений",
     "xHasAnUpdate": "{} есть обновление",
     "appsUpdated": "Приложения обновлены",
+    "appsNotUpdated": "Не удалось обновить приложения",
     "appsUpdatedNotifDescription": "Уведомляет об обновлении одного или нескольких приложений в фоновом режиме",
     "xWasUpdatedToY": "{} была обновлена до версии {}",
+    "xWasNotUpdatedToY": "Не удалось обновить {} до версии {}",
     "errorCheckingUpdates": "Ошибка при проверке обновлений",
     "errorCheckingUpdatesNotifDescription": "Уведомление о завершении проверки обновлений в фоновом режиме с ошибкой",
     "appsRemoved": "Приложение удалено",
@@ -183,6 +189,9 @@
     "disableVersionDetection": "Отключить обнаружение версии",
     "noVersionDetectionExplanation": "Эта настройка должна использоваться только для приложений, где обнаружение версии не работает корректно",
     "downloadingX": "Загрузка {}",
+    "downloadX": "Скачать {}",
+    "downloadedX": "Загружено {}",
+    "releaseAsset": "Освобождение актива",
     "downloadNotifDescription": "Уведомляет пользователя о прогрессе загрузки приложения",
     "noAPKFound": "APK не найден",
     "noVersionDetection": "Обнаружение версий отключено",
@@ -279,12 +288,12 @@
     "supportFixedAPKURL": "Поддержка фиксированных URL-адресов APK",
     "selectX": "Выбрать {}",
     "parallelDownloads": "Разрешить параллельные загрузки",
-    "installMethod": "Метод установки",
-    "normal": "Нормальный",
-    "root": "Суперпользователь",
-    "shizukuBinderNotFound": "Совместимый сервис Shizuku не найден",
+    "useShizuku": "Использовать Shizuku или Sui для установки",
+    "shizukuBinderNotFound": "Совместимый сервис Shizuku не найден, возможно он не запущен",
+    "shizukuOld": "Устаревшая версия Shizuku (<11), обновите",
+    "shizukuOldAndroidWithADB": "Shizuku работает на Android < 8.1 с ADB, обновите Android или используйте Sui",
+    "shizukuPretendToBeGooglePlay": "Указать Google Play как источник установки (если используется Shizuku)",
     "useSystemFont": "Использовать системный шрифт",
-    "systemFontError": "Ошибка загрузки системного шрифта: {}",
     "useVersionCodeAsOSVersion": "Использовать код версии приложения как версию, обнаруженную ОС",
     "requestHeader": "Заголовок запроса",
     "useLatestAssetDateAsReleaseDate": "Использовать последнюю загрузку ресурса в качестве даты выпуска",
@@ -299,6 +308,10 @@
     "note": "Примечание",
     "selfHostedNote": "Выпадающий список \"{}\" можно использовать для доступа к самостоятельно размещенным/настроенным экземплярам любого источника.",
     "badDownload": "APK не удалось разобрать (несовместимая или неполная загрузка)",
+    "beforeNewInstallsShareToAppVerifier": "Поделитесь новыми приложениями с AppVerifier (если доступно)",
+    "appVerifierInstructionToast": "Поделитесь с AppVerifier, а затем вернитесь сюда, когда будете готовы.",
+    "wiki": "Помощь/Вики",
+    "crowdsourcedConfigsLabel": "Конфигурации приложений на основе краудсорсинга (используйте на свой страх и риск)",
     "removeAppQuestion": {
         "one": "Удалить приложение?",
         "other": "Удалить приложения?"
@@ -347,12 +360,16 @@
         "one": "{} и ещё 1 приложение были обновлены",
         "other": "{} и ещё {} приложений были обновлены"
     },
+    "xAndNMoreUpdatesFailed": {
+        "one": "Не удалось обновить {} и ещё 1 приложение",
+        "other": "Не удалось обновить {} и ещё {} приложений"
+    },
     "xAndNMoreUpdatesPossiblyInstalled": {
         "one": "{} и ещё 1 приложение могли быть обновлены",
         "other": "{} и ещё {} приложений могли быть обновлены"
     },
     "apk": {
         "one": "{} APK",
-        "other": "{} APKs"
+        "other": "{} APKи"
     }
 }

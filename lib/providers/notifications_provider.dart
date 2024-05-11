@@ -41,20 +41,26 @@ class UpdateNotification extends ObtainiumNotification {
 }
 
 class SilentUpdateNotification extends ObtainiumNotification {
-  SilentUpdateNotification(List<App> updates, {int? id})
+  SilentUpdateNotification(List<App> updates, bool succeeded, {int? id})
       : super(
             id ?? 3,
-            tr('appsUpdated'),
+            succeeded
+                ? tr('appsUpdated')
+                : tr('appsNotUpdated'),
             '',
             'APPS_UPDATED',
             tr('appsUpdatedNotifChannel'),
             tr('appsUpdatedNotifDescription'),
             Importance.defaultImportance) {
     message = updates.length == 1
-        ? tr('xWasUpdatedToY',
-            args: [updates[0].finalName, updates[0].latestVersion])
-        : plural('xAndNMoreUpdatesInstalled', updates.length - 1,
-            args: [updates[0].finalName, (updates.length - 1).toString()]);
+        ? tr(succeeded
+            ? 'xWasUpdatedToY'
+            : 'xWasNotUpdatedToY',
+                args: [updates[0].finalName, updates[0].latestVersion])
+        : plural(succeeded
+            ? 'xAndNMoreUpdatesInstalled'
+            : "xAndNMoreUpdatesFailed",
+                updates.length - 1, args: [updates[0].finalName, (updates.length - 1).toString()]);
   }
 }
 
@@ -118,6 +124,18 @@ class DownloadNotification extends ObtainiumNotification {
             Importance.low,
             onlyAlertOnce: true,
             progPercent: progPercent);
+}
+
+class DownloadedNotification extends ObtainiumNotification {
+  DownloadedNotification(String fileName, String downloadUrl)
+      : super(
+            downloadUrl.hashCode,
+            tr('downloadedX', args: [fileName]),
+            '',
+            'FILE_DOWNLOADED',
+            tr('downloadedXNotifChannel', args: [tr('app')]),
+            tr('downloadedX', args: [tr('app')]),
+            Importance.defaultImportance);
 }
 
 final completeInstallationNotification = ObtainiumNotification(

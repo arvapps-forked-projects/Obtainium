@@ -4,11 +4,13 @@
 
 Get Android App Updates Directly From the Source.
 
-Obtainium allows you to install and update Apps directly from their releases pages, and receive notifications when new releases are made available.
+Obtainium allows you to install and update apps directly from their releases pages, and receive notifications when new releases are made available.
 
-Motivation: [Side Of Burritos - You should use this instead of F-Droid | How to use app RSS feed](https://youtu.be/FFz57zNR_M0)
-
-Read the Wiki: [https://github.com/ImranR98/Obtainium/wiki](https://github.com/ImranR98/Obtainium/wiki)
+More info:
+- [Obtainium/wiki](https://github.com/ImranR98/Obtainium/wiki)
+- [AppVerifier](https://github.com/soupslurpr/AppVerifier) - App verification tool (recommended, integrates with Obtainium)
+- [apps.obtainium.imranr.dev](https://apps.obtainium.imranr.dev/) - Crowdsourced app configurations
+- [Side Of Burritos - You should use this instead of F-Droid | How to use app RSS feed](https://youtu.be/FFz57zNR_M0) - Original motivation for this app
 
 Currently supported App sources:
 - Open Source - General:
@@ -18,7 +20,6 @@ Currently supported App sources:
   - [F-Droid](https://f-droid.org/)
   - Third Party F-Droid Repos
   - [IzzyOnDroid](https://android.izzysoft.de/)
-  - [SourceForge](https://sourceforge.net/)
   - [SourceHut](https://git.sr.ht/)
 - Other - General:
   - [APKPure](https://apkpure.net/)
@@ -28,14 +29,22 @@ Currently supported App sources:
   - [Huawei AppGallery](https://appgallery.huawei.com/)
   - Jenkins Jobs
 - Open Source - App-Specific:
-  - [Mullvad](https://mullvad.net/en/)
   - [Signal](https://signal.org/)
   - [VLC](https://videolan.org/)
 - Other - App-Specific:
   - [WhatsApp](https://whatsapp.com)
   - [Telegram App](https://telegram.org)
   - [Neutron Code](https://neutroncode.com)
+- Direct APK Link
 - "HTML" (Fallback): Any other URL that returns an HTML page with links to APK files
+
+## Finding App Configurations
+
+You can find crowdsourced app configurations at [apps.obtainium.imranr.dev](https://apps.obtainium.imranr.dev).
+
+If you can't find the configuration for an app you want, feel free to leave a request on the [discussions page](https://github.com/ImranR98/apps.obtainium.imranr.dev/discussions/new?category=app-requests).
+
+Or, contribute some configurations to the website by creating a PR at [this repo](https://github.com/ImranR98/apps.obtainium.imranr.dev).
 
 ## Installation
 
