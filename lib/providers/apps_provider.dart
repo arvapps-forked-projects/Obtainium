@@ -329,6 +329,10 @@ Future<Map<String, String>> getHeaders(String url,
   return returnHeaders;
 }
 
+Future<List<PackageInfo>> getAllInstalledInfo() async {
+  return await pm.getInstalledPackages() ?? [];
+}
+
 Future<PackageInfo?> getInstalledInfo(String? packageName,
     {bool printErr = true}) async {
   if (packageName != null) {
@@ -364,7 +368,9 @@ class AppsProvider with ChangeNotifier {
     foregroundStream = FGBGEvents.stream.asBroadcastStream();
     foregroundSubscription = foregroundStream?.listen((event) async {
       isForeground = event == FGBGType.foreground;
-      if (isForeground) loadApps();
+      if (isForeground) {
+        await loadApps();
+      }
     });
     () async {
       await settingsProvider.initializeSettings();
@@ -421,7 +427,8 @@ class AppsProvider with ChangeNotifier {
   }
 
   Future<Object> downloadApp(App app, BuildContext? context,
-      {NotificationsProvider? notificationsProvider}) async {
+      {NotificationsProvider? notificationsProvider,
+      bool useExisting = true}) async {
     var notifId = DownloadNotification(app.finalName, 0).id;
     if (apps[app.id] != null) {
       apps[app.id]!.downloadProgress = 0;
@@ -453,7 +460,7 @@ class AppsProvider with ChangeNotifier {
           notificationsProvider?.notify(notif);
         }
         prevProg = prog;
-      }, APKDir.path);
+      }, APKDir.path, useExisting: useExisting);
       // Set to 90 for remaining steps, will make null in 'finally'
       if (apps[app.id] != null) {
         apps[app.id]!.downloadProgress = -1;
@@ -766,7 +773,8 @@ class AppsProvider with ChangeNotifier {
   Future<List<String>> downloadAndInstallLatestApps(
       List<String> appIds, BuildContext? context,
       {NotificationsProvider? notificationsProvider,
-      bool forceParallelDownloads = false}) async {
+      bool forceParallelDownloads = false,
+      bool useExisting = true}) async {
     notificationsProvider =
         notificationsProvider ?? context?.read<NotificationsProvider>();
     List<String> appsToInstall = [];
@@ -818,21 +826,82 @@ class AppsProvider with ChangeNotifier {
     appsToInstall =
         moveStrToEnd(appsToInstall, obtainiumId, strB: obtainiumTempId);
 
-    Future<String> updateFn(String id, {bool skipInstalls = false}) async {
+    Future<void> installFn(String id, bool willBeSilent,
+        DownloadedApk? downloadedFile, DownloadedXApkDir? downloadedDir) async {
+      apps[id]?.downloadProgress = -1;
+      notifyListeners();
+      try {
+        bool sayInstalled = true;
+        var contextIfNewInstall =
+            apps[id]?.installedInfo == null ? context : null;
+        bool needBGWorkaround =
+            willBeSilent && context == null && !settingsProvider.useShizuku;
+        if (downloadedFile != null) {
+          if (needBGWorkaround) {
+            // ignore: use_build_context_synchronously
+            installApk(downloadedFile, contextIfNewInstall,
+                needsBGWorkaround: true);
+          } else {
+            // ignore: use_build_context_synchronously
+            sayInstalled = await installApk(downloadedFile, contextIfNewInstall,
+                shizukuPretendToBeGooglePlay: apps[id]!
+                        .app
+                        .additionalSettings['shizukuPretendToBeGooglePlay'] ==
+                    true);
+          }
+        } else {
+          if (needBGWorkaround) {
+            // ignore: use_build_context_synchronously
+            installXApkDir(downloadedDir!, contextIfNewInstall,
+                needsBGWorkaround: true);
+          } else {
+            // ignore: use_build_context_synchronously
+            sayInstalled = await installXApkDir(
+                downloadedDir!, contextIfNewInstall,
+                shizukuPretendToBeGooglePlay: apps[id]!
+                        .app
+                        .additionalSettings['shizukuPretendToBeGooglePlay'] ==
+                    true);
+          }
+        }
+        if (willBeSilent && context == null) {
+          if (!settingsProvider.useShizuku) {
+            notificationsProvider?.notify(SilentUpdateAttemptNotification(
+                [apps[id]!.app],
+                id: id.hashCode));
+          } else {
+            notificationsProvider?.notify(SilentUpdateNotification(
+                [apps[id]!.app], sayInstalled,
+                id: id.hashCode));
+          }
+        }
+        if (sayInstalled) {
+          installedIds.add(id);
+        }
+      } finally {
+        apps[id]?.downloadProgress = null;
+        notifyListeners();
+      }
+    }
+
+    Future<Map<Object?, Object?>> downloadFn(String id,
+        {bool skipInstalls = false}) async {
+      bool willBeSilent = false;
+      DownloadedApk? downloadedFile;
+      DownloadedXApkDir? downloadedDir;
       try {
         var downloadedArtifact =
             // ignore: use_build_context_synchronously
             await downloadApp(apps[id]!.app, context,
-                notificationsProvider: notificationsProvider);
-        DownloadedApk? downloadedFile;
-        DownloadedXApkDir? downloadedDir;
+                notificationsProvider: notificationsProvider,
+                useExisting: useExisting);
         if (downloadedArtifact is DownloadedApk) {
           downloadedFile = downloadedArtifact;
         } else {
           downloadedDir = downloadedArtifact as DownloadedXApkDir;
         }
         id = downloadedFile?.appId ?? downloadedDir!.appId;
-        bool willBeSilent = await canInstallSilently(apps[id]!.app);
+        willBeSilent = await canInstallSilently(apps[id]!.app);
         if (!settingsProvider.useShizuku) {
           if (!(await settingsProvider.getInstallPermission(enforce: false))) {
             throw ObtainiumError(tr('cancelled'));
@@ -853,80 +922,33 @@ class AppsProvider with ChangeNotifier {
           // ignore: use_build_context_synchronously
           await waitForUserToReturnToForeground(context);
         }
-        apps[id]?.downloadProgress = -1;
-        notifyListeners();
-        try {
-          if (!skipInstalls) {
-            bool sayInstalled = true;
-            var contextIfNewInstall =
-                apps[id]?.installedInfo == null ? context : null;
-            bool needBGWorkaround =
-                willBeSilent && context == null && !settingsProvider.useShizuku;
-            if (downloadedFile != null) {
-              if (needBGWorkaround) {
-                // ignore: use_build_context_synchronously
-                installApk(downloadedFile, contextIfNewInstall,
-                    needsBGWorkaround: true);
-              } else {
-                // ignore: use_build_context_synchronously
-                sayInstalled = await installApk(
-                    downloadedFile, contextIfNewInstall,
-                    shizukuPretendToBeGooglePlay:
-                        apps[id]!.app.additionalSettings[
-                                'shizukuPretendToBeGooglePlay'] ==
-                            true);
-              }
-            } else {
-              if (needBGWorkaround) {
-                // ignore: use_build_context_synchronously
-                installXApkDir(downloadedDir!, contextIfNewInstall,
-                    needsBGWorkaround: true);
-              } else {
-                // ignore: use_build_context_synchronously
-                sayInstalled = await installXApkDir(
-                    downloadedDir!, contextIfNewInstall,
-                    shizukuPretendToBeGooglePlay:
-                        apps[id]!.app.additionalSettings[
-                                'shizukuPretendToBeGooglePlay'] ==
-                            true);
-              }
-            }
-            if (willBeSilent && context == null) {
-              if (!settingsProvider.useShizuku) {
-                notificationsProvider?.notify(SilentUpdateAttemptNotification(
-                    [apps[id]!.app],
-                    id: id.hashCode));
-              } else {
-                notificationsProvider?.notify(SilentUpdateNotification(
-                    [apps[id]!.app], sayInstalled,
-                    id: id.hashCode));
-              }
-            }
-            if (sayInstalled) {
-              installedIds.add(id);
-            }
-          }
-        } finally {
-          apps[id]?.downloadProgress = null;
-          notifyListeners();
-        }
       } catch (e) {
         errors.add(id, e, appName: apps[id]?.name);
       }
-      return id;
+      return {
+        'id': id,
+        'willBeSilent': willBeSilent,
+        'downloadedFile': downloadedFile,
+        'downloadedDir': downloadedDir
+      };
     }
 
+    List<Map<Object?, Object?>> downloadResults = [];
     if (forceParallelDownloads || !settingsProvider.parallelDownloads) {
       for (var id in appsToInstall) {
-        await updateFn(id);
+        downloadResults.add(await downloadFn(id));
       }
     } else {
-      List<String> ids = await Future.wait(
-          appsToInstall.map((id) => updateFn(id, skipInstalls: true)));
-      for (var id in ids) {
-        if (!errors.appIdNames.containsKey(id)) {
-          await updateFn(id);
-        }
+      downloadResults = await Future.wait(
+          appsToInstall.map((id) => downloadFn(id, skipInstalls: true)));
+    }
+    for (var res in downloadResults) {
+      if (!errors.appIdNames.containsKey(res['id'])) {
+        await installFn(
+            res['id'] as String,
+            res['willBeSilent'] as bool,
+            res['downloadedFile'] as DownloadedApk?,
+            res['downloadedDir'] as DownloadedXApkDir?);
       }
     }
 
@@ -1144,17 +1166,6 @@ class AppsProvider with ChangeNotifier {
         : false;
   }
 
-  Future<void> updateInstallStatusInMemory(AppInMemory app) async {
-    apps[app.app.id]?.installedInfo = await getInstalledInfo(app.app.id);
-    apps[app.app.id]?.icon =
-        await apps[app.app.id]?.installedInfo?.applicationInfo?.getAppIcon();
-    apps[app.app.id]?.app.name = await (apps[app.app.id]
-            ?.installedInfo
-            ?.applicationInfo
-            ?.getAppLabel()) ??
-        app.name;
-  }
-
   Future<void> loadApps({String? singleId}) async {
     while (loadingApps) {
       await Future.delayed(const Duration(microseconds: 1));
@@ -1163,67 +1174,75 @@ class AppsProvider with ChangeNotifier {
     notifyListeners();
     var sp = SourceProvider();
     List<List<String>> errors = [];
-    List<App?> newApps = (await getAppsDir()) // Parse Apps from JSON
+    var installedAppsData = await getAllInstalledInfo();
+    List<String> removedAppIds = [];
+    await Future.wait((await getAppsDir()) // Parse Apps from JSON
         .listSync()
-        .where((item) => item.path.toLowerCase().endsWith('.json'))
-        .where((item) =>
-            singleId == null ||
-            item.path.split('/').last.toLowerCase() ==
-                '${singleId.toLowerCase()}.json')
-        .map((e) {
-      try {
-        return App.fromJson(jsonDecode(File(e.path).readAsStringSync()));
-      } catch (err) {
-        if (err is FormatException) {
-          logs.add('Corrupt JSON when loading App (will be ignored): $e');
-          e.renameSync('${e.path}.corrupt');
-        } else {
-          rethrow;
+        .map((item) async {
+      App? app;
+      if (item.path.toLowerCase().endsWith('.json') &&
+          (singleId == null ||
+              item.path.split('/').last.toLowerCase() ==
+                  '${singleId.toLowerCase()}.json')) {
+        try {
+          app = App.fromJson(jsonDecode(File(item.path).readAsStringSync()));
+        } catch (err) {
+          if (err is FormatException) {
+            logs.add('Corrupt JSON when loading App (will be ignored): $e');
+            item.renameSync('${item.path}.corrupt');
+          } else {
+            rethrow;
+          }
         }
       }
-    }).toList();
-    for (var app in newApps) {
-      // Put Apps into memory to list them (fast)
       if (app != null) {
+        // Save the app to the in-memory list without grabbing any OS info first
+        apps.update(
+            app.id,
+            (value) => AppInMemory(
+                app!, value.downloadProgress, value.installedInfo, value.icon),
+            ifAbsent: () => AppInMemory(app!, null, null, null));
+        notifyListeners();
         try {
+          // Try getting the app's source to ensure no invalid apps get loaded
           sp.getSource(app.url, overrideSource: app.overrideSource);
+          // If the app is installed, grab its OS data and reconcile install statuses
+          PackageInfo? installedInfo;
+          try {
+            installedInfo =
+                installedAppsData.firstWhere((i) => i.packageName == app!.id);
+          } catch (e) {
+            // If the app isn't installed the above throws an error
+          }
+          // Reconcile differences between the installed and recorded install info
+          var moddedApp =
+              getCorrectedInstallStatusAppIfPossible(app, installedInfo);
+          if (moddedApp != null) {
+            app = moddedApp;
+            // Note the app ID if it was uninstalled externally
+            if (moddedApp.installedVersion == null) {
+              removedAppIds.add(moddedApp.id);
+            }
+          }
+          // Update the app in memory with install info and corrections
           apps.update(
               app.id,
               (value) => AppInMemory(
-                  app, value.downloadProgress, value.installedInfo, value.icon),
-              ifAbsent: () => AppInMemory(app, null, null, null));
+                  app!, value.downloadProgress, installedInfo, value.icon),
+              ifAbsent: () => AppInMemory(app!, null, installedInfo, null));
+          notifyListeners();
         } catch (e) {
-          errors.add([app.id, app.finalName, e.toString()]);
+          errors.add([app!.id, app.finalName, e.toString()]);
         }
       }
-    }
-    notifyListeners();
+    }));
     if (errors.isNotEmpty) {
       removeApps(errors.map((e) => e[0]).toList());
       NotificationsProvider().notify(
           AppsRemovedNotification(errors.map((e) => [e[1], e[2]]).toList()));
     }
-    // Get install status and other OS info for each App (slow)
-    await Future.wait(apps.values.map((app) {
-      return updateInstallStatusInMemory(app);
-    }));
-    notifyListeners();
-    // Reconcile version differences
-    List<App> modifiedApps = [];
-    for (var app in apps.values) {
-      var moddedApp =
-          getCorrectedInstallStatusAppIfPossible(app.app, app.installedInfo);
-      if (moddedApp != null) {
-        modifiedApps.add(moddedApp);
-      }
-    }
-    if (modifiedApps.isNotEmpty) {
-      await saveApps(modifiedApps, attemptToCorrectInstallStatus: false);
-      var removedAppIds = modifiedApps
-          .where((a) => a.installedVersion == null)
-          .map((e) => e.id)
-          .toList();
-      // After reconciliation, delete externally uninstalled Apps if needed
+    // Delete externally uninstalled Apps if needed
+    if (removedAppIds.isNotEmpty) {
       if (removedAppIds.isNotEmpty) {
         if (settingsProvider.removeOnExternalUninstall) {
           await removeApps(removedAppIds);
@@ -1234,11 +1253,27 @@ class AppsProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> updateAppIcon(String? appId) async {
+    if (apps[appId]?.icon == null) {
+      var icon =
+          (await apps[appId]?.installedInfo?.applicationInfo?.getAppIcon());
+      if (icon != null) {
+        apps.update(
+            apps[appId]!.app.id,
+            (value) => AppInMemory(apps[appId]!.app, value.downloadProgress,
+                value.installedInfo, icon),
+            ifAbsent: () => AppInMemory(
+                apps[appId]!.app, null, apps[appId]?.installedInfo, icon));
+        notifyListeners();
+      }
+    }
+  }
+
   Future<void> saveApps(List<App> apps,
       {bool attemptToCorrectInstallStatus = true,
       bool onlyIfExists = true}) async {
     attemptToCorrectInstallStatus = attemptToCorrectInstallStatus;
-    for (var a in apps) {
+    await Future.wait(apps.map((a) async {
       var app = a.deepCopy();
       PackageInfo? info = await getInstalledInfo(app.id);
       var icon = await info?.applicationInfo?.getAppIcon();
@@ -1260,14 +1295,14 @@ class AppsProvider with ChangeNotifier {
           rethrow;
         }
       }
-    }
+    }));
     notifyListeners();
     export(isAuto: true);
   }
 
   Future<void> removeApps(List<String> appIds) async {
     var apkFiles = APKDir.listSync();
-    for (var appId in appIds) {
+    await Future.wait(appIds.map((appId) async {
       File file = File('${(await getAppsDir()).path}/$appId.json');
       if (file.existsSync()) {
         file.deleteSync(recursive: true);
@@ -1281,7 +1316,7 @@ class AppsProvider with ChangeNotifier {
       if (apps.containsKey(appId)) {
         apps.remove(appId);
       }
-    }
+    }));
     if (appIds.isNotEmpty) {
       notifyListeners();
       export(isAuto: true);
@@ -1540,6 +1575,8 @@ class AppsProvider with ChangeNotifier {
       settingsMap.forEach((key, value) {
         if (value is int) {
           settingsProvider.prefs?.setInt(key, value);
+        } else if (value is double) {
+          settingsProvider.prefs?.setDouble(key, value);
         } else if (value is bool) {
           settingsProvider.prefs?.setBool(key, value);
         } else if (value is List) {

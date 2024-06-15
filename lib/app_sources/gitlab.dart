@@ -112,6 +112,14 @@ class GitLab extends AppSource {
   }
 
   @override
+  Future<String> apkUrlPrefetchModifier(String apkUrl, String standardUrl,
+      Map<String, dynamic> additionalSettings) async {
+    String? PAT = await getPATIfAny(hostChanged ? additionalSettings : {});
+    String optionalAuth = (PAT != null) ? 'private_token=$PAT' : '';
+    return '$apkUrl?$optionalAuth';
+  }
+
+  @override
   Future<APKDetails> getLatestAPKDetails(
     String standardUrl,
     Map<String, dynamic> additionalSettings,
@@ -153,7 +161,8 @@ class GitLab extends AppSource {
               .toList();
       var apkUrlsSet = apkUrlsFromAssets.toSet();
       apkUrlsSet.addAll(uploadedAPKsFromDescription);
-      var releaseDateString = e['released_at'] ?? e['created_at'];
+      var releaseDateString =
+          e['released_at'] ?? e['created_at'] ?? e['commit']?['created_at'];
       DateTime? releaseDate =
           releaseDateString != null ? DateTime.parse(releaseDateString) : null;
       return APKDetails(
