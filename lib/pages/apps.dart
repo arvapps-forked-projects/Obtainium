@@ -416,6 +416,8 @@ class AppsPageState extends State<AppsPage> {
                 ? Image.memory(
                     listedApps[appIndex].icon!,
                     gaplessPlayback: true,
+                    opacity: AlwaysStoppedAnimation(
+                        listedApps[appIndex].installedInfo == null ? 0.6 : 1),
                   )
                 : Row(
                     mainAxisSize: MainAxisSize.min,
@@ -466,7 +468,7 @@ class AppsPageState extends State<AppsPage> {
           hasUpdate ? getUpdateButton(index) : const SizedBox.shrink(),
           hasUpdate
               ? const SizedBox(
-                  width: 10,
+                  width: 5,
                 )
               : const SizedBox.shrink(),
           GestureDetector(
@@ -918,6 +920,27 @@ class AppsPageState extends State<AppsPage> {
                           child: Text(tr('shareAppConfigLinks'))),
                       const Divider(),
                       TextButton(
+                          onPressed: selectedAppIds.isEmpty
+                              ? null
+                              : () {
+                                  var exportJSON = jsonEncode(
+                                      appsProvider.generateExportJSON(
+                                          appIds: selectedApps
+                                              .map((e) => e.id)
+                                              .toList(),
+                                          overrideExportSettings: false));
+                                  XFile f = XFile.fromData(
+                                      Uint8List.fromList(
+                                          utf8.encode(exportJSON)),
+                                      mimeType: 'application/json',
+                                      name:
+                                          '${tr('obtainiumExportHyphenatedLowercase')}-${selectedApps.length}-${DateTime.now().millisecondsSinceEpoch}');
+                                  Share.shareXFiles([f]);
+                                },
+                          child: Text(
+                              '${tr('share')} - ${tr('obtainiumExport')}')),
+                      const Divider(),
+                      TextButton(
                           onPressed: () {
                             appsProvider
                                 .downloadAppAssets(
@@ -1056,7 +1079,9 @@ class AppsPageState extends State<AppsPage> {
           IconButton(
               color: Theme.of(context).colorScheme.primary,
               style: const ButtonStyle(visualDensity: VisualDensity.compact),
-              tooltip: '${tr('filter')}${isFilterOff ? '' : ' *'}',
+              tooltip: isFilterOff
+                  ? tr('filterApps')
+                  : '${tr('filter')} - ${tr('remove')}',
               onPressed: isFilterOff
                   ? showFilterDialog
                   : () {
@@ -1065,8 +1090,8 @@ class AppsPageState extends State<AppsPage> {
                       });
                     },
               icon: Icon(isFilterOff
-                  ? Icons.filter_list_rounded
-                  : Icons.filter_list_off_rounded)),
+                  ? Icons.search_rounded
+                  : Icons.search_off_rounded)),
           const SizedBox(
             width: 10,
           ),
@@ -1105,6 +1130,7 @@ class AppsPageState extends State<AppsPage> {
               interactive: true,
               controller: scrollController,
               child: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   controller: scrollController,
                   slivers: <Widget>[
                     CustomAppBar(title: tr('appsString')),
